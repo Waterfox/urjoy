@@ -61,6 +61,37 @@ class Service(object):
 
     def init_joystick(self):
         joySub = rospy.Subscriber("joy",Joy,self.joy_callback)
+        spaceSub = rospy.Subscriber("/spacenav/joy",Joy,self.space_callback)
+
+    def space_callback(self,data):
+        self.cmd.reset()
+
+        self.cmd.axis0 = data.axes[0] #Y
+        self.cmd.axis1 = data.axes[1] #X
+        self.cmd.axis2 = data.axes[2] #Z
+        self.cmd.axis3 = data.axes[3] #roll
+        self.cmd.axis4 = data.axes[4] #pitch
+        self.cmd.axis5 = data.axes[5] #yaw
+
+        self.cmd.btn1 = data.buttons[0]
+        self.cmd.btn2 = data.buttons[1]
+        # for i in range(0, len(data.axes)):-
+        #     val = data.axes[i]
+        #
+        #     if abs(val) < 0.05:  #deadband already in ROS
+        #         val = 0
+        #     tmp = "self.cmd.axis" + str(i) + " = " + str(val)
+        #     if val != 0:
+        #         print(tmp)
+        #         exec(tmp)
+
+        #get button state
+        #F710 has 12 buttons
+        # for i in range(0, len(data.buttons)):
+        #     if data.buttons[i] != 0:
+        #         tmp = "self.cmd.btn" + str(i) + " = 1"
+        #         print(tmp)
+        #         exec(tmp)
 
 
     def joy_callback(self,data):
@@ -87,6 +118,24 @@ class Service(object):
 
     def init_robotiq(self):
         self.robotiqPub = rospy.Publisher('/Robotiq2FGripperRobotOutput',gripperOutMsg,queue_size=1)
+        grippermsg = gripperOutMsg()
+        grippermsg.rACT = 0
+        grippermsg.rGTO = 0
+        grippermsg.rATR = 0
+        grippermsg.rPR = 0
+        grippermsg.rSP = 0
+        grippermsg.rFR = 0
+        self.robotiqPub.publish(grippermsg)
+
+        grippermsg = gripperOutMsg()
+        grippermsg.rACT = 1
+        grippermsg.rGTO = 1
+        grippermsg.rATR = 0
+        grippermsg.rPR = 0
+        grippermsg.rSP = 255
+        grippermsg.rFR = 10
+        self.robotiqPub.publish(grippermsg)
+
 
     def status_cb(self,msg):
         self.gripper_status = msg
@@ -101,10 +150,12 @@ class Service(object):
         speeds = [0, 0, 0, 0, 0, 0]
 
         #get linear speed from joystick
-        speeds[0] = 1 * self.cmd.axis0 * self.linear_velocity #Y
+        speeds[0] = -1 * self.cmd.axis0 * self.linear_velocity #Y
         speeds[1] = -1 * self.cmd.axis1 * self.linear_velocity # X
-        speeds[2] = -1 * self.cmd.axis3 * self.linear_velocity # Z
-        speeds[4] = -1 * self.cmd.axis2 * self.linear_velocity #roll
+        speeds[2] = -1 * self.cmd.axis2 * self.linear_velocity # Z
+        speeds[3] = -1 * self.cmd.axis3 *self.rotational_velocity # pitch
+        speeds[4] = -1 * self.cmd.axis4 * self.rotational_velocity #roll
+        speeds[5] = -1 * self.cmd.axis5 *self.rotational_velocity # yaw
         if self.cmd.btn7:
              speeds[3]= 1 * self.rotational_velocity #pitch
         if self.cmd.btn6:
@@ -151,7 +202,7 @@ if __name__ == "__main__":
 
     try:
     #start joystick service with given max speed and acceleration
-        service = Service(robot, linear_velocity=0.3, rotational_velocity=0.3, acceleration=0.5)
+        service = Service(robot, linear_velocity=0.5, rotational_velocity=0.5, acceleration=0.7)
 
     finally:
         robot.close()
